@@ -53,17 +53,101 @@ const AuthForm = ({ onLogin }: AuthFormProps) => {
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
+ 
+  const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (validateForm()) {
-      const user: User = {
-        username: formData.username || formData.email.split("@")[0],
-        email: formData.email
-      };
-      onLogin(user);
+  // 1️⃣ Validate the form fields first
+  if (!validateForm()) return;
+
+  try {
+    let response;
+
+    if (isLogin) {
+      // 🔹 Login API call
+      response = await fetch("https://your-api.com/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+        }),
+      });
+    } else {
+      // 🔹 Signup API call
+      response = await fetch("https://your-api.com/signup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username: formData.username,
+          email: formData.email,
+          password: formData.password,
+        }),
+      });
     }
-  };
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      // ❌ API returned error, show in form
+      setErrors({ general: data.message || "Something went wrong" });
+      return;
+    }
+
+    // ✅ Success
+    const user = {
+      username: data.username || formData.username,
+      email: data.email,
+    };
+    onLogin(user);
+    setErrors({}); // clear any previous errors
+  } catch (err) {
+    setErrors({ general: "Network error. Please try again." });
+  }
+};
+
+//   const handleSubmit = (e: React.FormEvent) => {
+//   e.preventDefault();
+//   if (!validateForm()) return;
+
+//   // 🧠 Dummy stored user for testing
+//   const dummyUser = {
+//     username: "testuser",
+//     email: "test@example.com",
+//     password: "123456", // plain text only for demo
+//   };
+
+//   if (isLogin) {
+//     // ---- LOGIN CHECK ----
+//     if (
+//       formData.email === dummyUser.email &&
+//       formData.password === dummyUser.password
+//     ) {
+//       // success
+//       onLogin({ username: dummyUser.username, email: dummyUser.email });
+//     } else {
+//       setErrors({ general: "Invalid email or password" });
+//     }
+//   } else {
+//     // ---- SIGNUP SIMULATION ----
+//     if (formData.email === dummyUser.email) {
+//       setErrors({ general: "User already exists" });
+//     } else {
+//       // pretend signup success
+//       const newUser = {
+//         username: formData.username || formData.email.split("@")[0],
+//         email: formData.email,
+//       };
+//       onLogin(newUser);
+//     }
+//   }
+// }; dummy login simulation
+
+
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -219,6 +303,10 @@ const AuthForm = ({ onLogin }: AuthFormProps) => {
               >
                 {isLogin ? "Sign In" : "Create Account"}
               </Button>
+              {errors.general && (
+                <p className="text-red-500 text-sm mt-2 text-center">{errors.general}</p>
+              )}
+
             </form>
 
             <div className="mt-6 text-center">

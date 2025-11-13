@@ -18,11 +18,11 @@ import EmergencySupport from "@/components/EmergencySupport";
 import AuthForm from "@/components/AuthForm";
 import { Heart, Brain, TrendingUp, MessageCircle, User, TestTube, Music, GamepadIcon, Dumbbell, Apple, BookOpen, AlertTriangle, LogOut } from "lucide-react";
 
-const Index = () => {
+const Index = ({ username, onLogout }) => {
   const [selectedTab, setSelectedTab] = useState("tracker");
   const [userMood, setUserMood] = useState(3);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [username, setUsername] = useState("");
+  
 
   const getMoodTheme = (mood: number) => {
     switch (mood) {
@@ -34,22 +34,6 @@ const Index = () => {
       default: return "from-blue-500 to-purple-500";
     }
   };
-
-  const handleLogin = (user: { username: string; email: string }) => {
-    setUsername(user.username);
-    setIsAuthenticated(true);
-  };
-
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    setUsername("");
-    setUserMood(3);
-    setSelectedTab("tracker");
-  };
-
-  if (!isAuthenticated) {
-    return <AuthForm onLogin={handleLogin} />;
-  }
 
   return (
     <div className="min-h-screen relative overflow-hidden">
@@ -92,7 +76,7 @@ const Index = () => {
               <div className="flex items-center gap-4">
                 <span className="text-gray-700 font-medium">Welcome, {username}!</span>
                 <Button
-                  onClick={handleLogout}
+                  onClick={onLogout}
                   variant="outline"
                   size="sm"
                   className="bg-white/20 backdrop-blur-md border-white/30 hover:bg-white/30"

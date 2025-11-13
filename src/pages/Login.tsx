@@ -6,8 +6,12 @@ const Login = () => {
   const navigate = useNavigate();
 
   const handleLogin = () => {
-    // ✅ validate credentials here
-    navigate("/dashboard");
+    if(true){
+      navigate("/dashboard");
+    }
+    else{
+      alert("Invalid credentials");
+    }
   };
 
   return (
