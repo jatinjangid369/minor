@@ -1,32 +1,58 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import NotFound from "./pages/NotFound";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import AuthPage from "./pages/AuthPage";
-import Dashboard from "./pages/Dashboard"
-
+import Dashboard from "./pages/Dashboard";
+import NotFound from "./pages/NotFound";
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(true);
-  const [username, setUsername] = useState("");
+const [isAuthenticated, setIsAuthenticated] = useState(null);  // null = loading
+const [username, setUsername] = useState("");
+
+useEffect(() => {
+  const token = localStorage.getItem("authToken");
+  if (!token) {
+    setIsAuthenticated(false);
+    return;
+  }
+
+  fetch("http://localhost:5000/api/validate", {
+    headers: { Authorization: `Bearer ${token}` }
+  })
+    .then(res => {
+      return res.json();   // IMPORTANT: return this
+    })
+    .then(data => {
+      if (data.status) {
+        setUsername(data.username);
+        setIsAuthenticated(true);
+      } else {
+        setIsAuthenticated(false);
+      }
+    })
+    .catch(() => {
+      setIsAuthenticated(false);
+    });
+}, []);
+
 
   const handleLogin = (user) => {
     setUsername(user.username);
     setIsAuthenticated(true);
   };
 
-  const handleLogout =  () => {
+  const handleLogout = () => {
     setIsAuthenticated(false);
     setUsername("");
+    localStorage.removeItem("authToken");
   };
+
+if (isAuthenticated === null) {
+  return <div>Loading...</div>;   // waits for fetch!
+}
 
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public login/signup page */}
         <Route
           path="/login"
           element={
@@ -37,8 +63,6 @@ function App() {
             )
           }
         />
-
-        {/* Protected dashboard route */}
         <Route
           path="/dashboard"
           element={
@@ -49,8 +73,6 @@ function App() {
             )
           }
         />
-
-        {/* Redirect root path */}
         <Route
           path="/"
           element={
@@ -61,8 +83,6 @@ function App() {
             )
           }
         />
-
-        {/* Catch-all 404 route */}
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

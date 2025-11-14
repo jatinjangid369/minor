@@ -101,8 +101,10 @@ const Index = ({ username, onLogout }) => {
           </div>
 
           <div className="animate-fade-in-up delay-400">
+            
             <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-6">
-              <TabsList className="grid w-full grid-cols-6 lg:grid-cols-12 gap-1 bg-white/30 backdrop-blur-md border border-white/40 shadow-xl">
+              <div className="flex justify-center">
+              <TabsList className="inline-flex justify-center gap-1 bg-white/30 backdrop-blur-md border border-white/40 shadow-xl rounded-xl px-2 py-1">
                 <TabsTrigger value="tracker" className="flex items-center gap-1 text-xs transition-all duration-300 hover:scale-105 data-[state=active]:bg-white/80">
                   <Heart className="h-3 w-3 animate-heartbeat" />
                   <span className="hidden sm:inline">Mood</span>
@@ -111,10 +113,10 @@ const Index = ({ username, onLogout }) => {
                   <TestTube className="h-3 w-3" />
                   <span className="hidden sm:inline">Quiz</span>
                 </TabsTrigger>
-                <TabsTrigger value="personality" className="flex items-center gap-1 text-xs transition-all duration-300 hover:scale-105 data-[state=active]:bg-white/80">
+                {/* <TabsTrigger value="personality" className="flex items-center gap-1 text-xs transition-all duration-300 hover:scale-105 data-[state=active]:bg-white/80">
                   <User className="h-3 w-3" />
                   <span className="hidden sm:inline">AI Doc</span>
-                </TabsTrigger>
+                </TabsTrigger> */}
                 <TabsTrigger value="binaural" className="flex items-center gap-1 text-xs transition-all duration-300 hover:scale-105 data-[state=active]:bg-white/80">
                   <Music className="h-3 w-3" />
                   <span className="hidden sm:inline">Audio</span>
@@ -135,10 +137,10 @@ const Index = ({ username, onLogout }) => {
                   <BookOpen className="h-3 w-3" />
                   <span className="hidden sm:inline">Stories</span>
                 </TabsTrigger>
-                <TabsTrigger value="emergency" className="flex items-center gap-1 text-xs transition-all duration-300 hover:scale-105 data-[state=active]:bg-white/80">
+                {/* <TabsTrigger value="emergency" className="flex items-center gap-1 text-xs transition-all duration-300 hover:scale-105 data-[state=active]:bg-white/80">
                   <AlertTriangle className="h-3 w-3 text-red-500" />
                   <span className="hidden sm:inline">SOS</span>
-                </TabsTrigger>
+                </TabsTrigger> */}
                 <TabsTrigger value="checkin" className="flex items-center gap-1 text-xs transition-all duration-300 hover:scale-105 data-[state=active]:bg-white/80">
                   <Brain className="h-3 w-3 animate-spin-slow" />
                   <span className="hidden sm:inline">Check-in</span>
@@ -151,8 +153,8 @@ const Index = ({ username, onLogout }) => {
                   <MessageCircle className="h-3 w-3 animate-wiggle" />
                   <span className="hidden sm:inline">Chat</span>
                 </TabsTrigger>
-              </TabsList>
-
+                </TabsList>
+              </div>
               <TabsContent value="tracker" className="space-y-6 animate-fade-in-scale">
                 <MoodTracker onMoodChange={setUserMood} />
               </TabsContent>
@@ -201,6 +203,7 @@ const Index = ({ username, onLogout }) => {
                 <ChatSupport />
               </TabsContent>
             </Tabs>
+            
           </div>
         </main>
       </div>
