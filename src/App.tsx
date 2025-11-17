@@ -18,12 +18,17 @@ useEffect(() => {
   fetch("http://localhost:5000/api/validate", {
     headers: { Authorization: `Bearer ${token}` }
   })
-    .then(res => {
-      return res.json();   // IMPORTANT: return this
+    .then((res) => {
+      if (!res.ok) {
+        setIsAuthenticated(false);
+        throw new Error("Invalid token");
+      }
+      return res.json();
     })
-    .then(data => {
-      if (data.status) {
-        setUsername(data.username);
+    .then((data) => {
+      // server returns { status: 'success', data: { username, ... } }
+      if (data?.status === "success" && data?.data) {
+        setUsername(data.data.username || "");
         setIsAuthenticated(true);
       } else {
         setIsAuthenticated(false);
