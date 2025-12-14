@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -22,12 +22,62 @@ const MoodQuiz = ({ onMoodResult }: MoodQuizProps) => {
   const [answers, setAnswers] = useState<number[]>([]);
   const [quizComplete, setQuizComplete] = useState(false);
   const [moodScore, setMoodScore] = useState(0);
-  const [quizHistory, setQuizHistory] = useState<Array<{ date: string; score: number; mood: string }>>([
-    { date: "Today", score: 85, mood: "Great" },
-    { date: "Yesterday", score: 65, mood: "Good" },
-    { date: "2 days ago", score: 45, mood: "Okay" },
-    { date: "3 days ago", score: 25, mood: "Low" },
-  ]);
+  const [quizHistory, setQuizHistory] = useState<Array<{ date: string; score: number; mood: string }>>([]);
+
+  useEffect(() => {
+    fetchQuizHistory();
+  }, []);
+
+  const fetchQuizHistory = async () => {
+    try {
+      const token = localStorage.getItem("authToken");
+      if (!token) return;
+
+      const response = await fetch("http://localhost:5000/api/mood/quiz/history", {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      if (data.status === "success") {
+        setQuizHistory(data.data.map((item: any) => ({
+          ...item,
+          // Format date if needed, or backend can return formatted
+          // Assuming backend returns a somewhat usable date string or we format it here
+          date: new Date(item.date).toLocaleDateString()
+        })));
+      }
+    } catch (error) {
+      console.error("Failed to fetch quiz history", error);
+    }
+  };
+
+  const saveQuizResult = async (score: number, moodLabel: string, answers: { q: number; v: number }[]) => {
+    try {
+      const token = localStorage.getItem("authToken");
+      if (!token) return;
+      const response = await fetch("http://localhost:5000/api/mood/quiz", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ score, moodLabel, answers })
+      });
+
+      const data = await response.json();
+      if (data.status === "success") {
+        // Refresh history after saving
+        fetchQuizHistory();
+      } else {
+        toast.error("Failed to save quiz result");
+      }
+
+    } catch (error) {
+      console.error("Failed to save quiz result", error);
+      toast.error("Error saving result");
+    }
+  }
 
   const quizQuestions: QuizQuestion[] = [
     {
@@ -98,22 +148,23 @@ const MoodQuiz = ({ onMoodResult }: MoodQuizProps) => {
       const totalScore = newAnswers.reduce((sum, score) => sum + score, 0);
       const averageScore = totalScore / quizQuestions.length;
       const percentageScore = (averageScore / 5) * 100;
-      
-      setMoodScore(Math.round(percentageScore));
+
+      const finalScore = Math.round(percentageScore);
+      const moodLabel = getMoodLabel(finalScore);
+
+      setMoodScore(finalScore);
       setQuizComplete(true);
       onMoodResult(Math.round(averageScore));
-      
-      // Add to history
-      const moodLabel = getMoodLabel(Math.round(percentageScore));
-      const newEntry = {
-        date: "Today",
-        score: Math.round(percentageScore),
-        mood: moodLabel
-      };
-      
-      setQuizHistory(prev => [newEntry, ...prev.slice(0, 6)]);
-      
-      toast.success(`Quiz completed! Your mood score: ${Math.round(percentageScore)}%`);
+
+      // Construct answers payload
+      const answersPayload = newAnswers.map((val, index) => ({
+        q: quizQuestions[index].id,
+        v: val
+      }));
+
+      saveQuizResult(finalScore, moodLabel, answersPayload);
+
+      toast.success(`Quiz completed! Your mood score: ${finalScore}%`);
     }
   };
 
@@ -200,8 +251,8 @@ const MoodQuiz = ({ onMoodResult }: MoodQuizProps) => {
               </div>
             </div>
 
-            <Button 
-              onClick={restartQuiz} 
+            <Button
+              onClick={restartQuiz}
               className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
             >
               <RotateCcw className="h-4 w-4 mr-2" />
@@ -221,7 +272,7 @@ const MoodQuiz = ({ onMoodResult }: MoodQuizProps) => {
                 <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" />
                 <XAxis dataKey="date" stroke="#6b7280" tick={{ fontSize: 12 }} />
                 <YAxis stroke="#6b7280" tick={{ fontSize: 12 }} domain={[0, 100]} />
-                <Tooltip 
+                <Tooltip
                   contentStyle={{
                     backgroundColor: 'rgba(255, 255, 255, 0.9)',
                     backdropFilter: 'blur(10px)',
@@ -231,9 +282,9 @@ const MoodQuiz = ({ onMoodResult }: MoodQuizProps) => {
                   }}
                   formatter={(value: number) => [`${value}%`, "Mood Score"]}
                 />
-                <Bar 
-                  dataKey="score" 
-                  fill="url(#barGradient)" 
+                <Bar
+                  dataKey="score"
+                  fill="url(#barGradient)"
                   radius={[4, 4, 0, 0]}
                 />
                 <defs>
@@ -270,7 +321,7 @@ const MoodQuiz = ({ onMoodResult }: MoodQuizProps) => {
           <h3 className="text-lg font-semibold text-gray-800 mb-4">
             {quizQuestions[currentQuestion].question}
           </h3>
-          
+
           <div className="space-y-3">
             {quizQuestions[currentQuestion].options.map((option, index) => (
               <Button

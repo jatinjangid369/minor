@@ -45,6 +45,28 @@ INSERT INTO mood_logs (user_id, mood, note, created_at) VALUES
 (1, 4, 'Feeling better.',  '2025-05-31 10:00:00');  -- Happy
 
 -- ============================================================
+-- Mood Quiz Results Table
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS mood_quiz_results (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  score INT NOT NULL,     -- Percentage score (0-100)
+  mood_label VARCHAR(50), -- e.g. "Excellent", "Good", etc.
+  answers JSON,           -- Store individual answers e.g. [{"q":1, "v":2}, ...]
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+-- Seed Mood Quiz Results
+INSERT INTO mood_quiz_results (user_id, score, mood_label, answers, created_at) VALUES
+(1, 85, 'Excellent', '[{"q":1, "v":5}, {"q":2, "v":4}, {"q":3, "v":4}, {"q":4, "v":4}, {"q":5, "v":4}]', DATE_SUB(NOW(), INTERVAL 0 DAY)),
+(1, 65, 'Great',    '[{"q":1, "v":3}, {"q":2, "v":3}, {"q":3, "v":3}, {"q":4, "v":3}, {"q":5, "v":4}]', DATE_SUB(NOW(), INTERVAL 1 DAY)),
+(1, 45, 'Good',     '[{"q":1, "v":2}, {"q":2, "v":2}, {"q":3, "v":2}, {"q":4, "v":3}, {"q":5, "v":2}]', DATE_SUB(NOW(), INTERVAL 2 DAY)),
+(1, 25, 'Okay',     '[{"q":1, "v":1}, {"q":2, "v":1}, {"q":3, "v":1}, {"q":4, "v":1}, {"q":5, "v":1}]', DATE_SUB(NOW(), INTERVAL 3 DAY));
+
+-- ============================================================
 -- Mood Journey Query (FOR REFERENCE ONLY, NOT EXECUTED IN SEED)
 -- ============================================================
 

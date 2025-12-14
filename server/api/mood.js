@@ -61,6 +61,47 @@ router.get("/stats", authenticateToken, async (req, res) => {
     }
 });
 
+// GET /api/mood/quiz/history - Fetch quiz history for the authenticated user
+router.get("/quiz/history", authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const [rows] = await db.execute(
+            "SELECT id, score, mood_label as mood, answers, DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') as date FROM mood_quiz_results WHERE user_id = ? ORDER BY created_at DESC LIMIT 10",
+            [userId]
+        );
+
+        // Format date to friendly string if needed, or keep as is
+        // For chart, we might want "Today", "Yesterday", etc. or just the date
+        // Let's do some basic formatting in JS if needed, or send raw date
+
+        res.json({ status: "success", data: rows });
+    } catch (err) {
+        console.error("Error fetching quiz history:", err);
+        res.status(500).json({ status: "error", message: "Server error" });
+    }
+});
+
+// POST /api/mood/quiz - Save a new mood quiz result
+router.post("/quiz", authenticateToken, async (req, res) => {
+    const { score, moodLabel, answers } = req.body;
+    const userId = req.user.id;
+
+    if (score === undefined || !moodLabel) {
+        return res.status(400).json({ status: "error", message: "Score and Mood Label are required" });
+    }
+
+    try {
+        await db.execute(
+            "INSERT INTO mood_quiz_results (user_id, score, mood_label, answers) VALUES (?, ?, ?, ?)",
+            [userId, score, moodLabel, answers ? JSON.stringify(answers) : null]
+        );
+        res.status(201).json({ status: "success", message: "Quiz result saved successfully" });
+    } catch (err) {
+        console.error("Error saving quiz result:", err);
+        res.status(500).json({ status: "error", message: "Server error" });
+    }
+});
+
 // POST /api/mood/log - Create a new mood log
 router.post("/log", authenticateToken, async (req, res) => {
     const { mood, note } = req.body;
