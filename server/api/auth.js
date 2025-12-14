@@ -1,6 +1,7 @@
 const express = require("express");
 const jwt = require("jsonwebtoken");
 const { findUserByEmail, addUser } = require("../users");
+const authenticateToken = require("../middleware/auth");
 // users array import removed as it's no longer exported or used directly
 
 const router = express.Router();
@@ -18,19 +19,7 @@ function generateToken(user) {
   );
 }
 
-// Middleware to validate JWT
-function authenticateToken(req, res, next) {
-  const authHeader = req.headers["authorization"];
-  const token = authHeader && authHeader.split(" ")[1]; // Bearer <token>
-
-  if (!token) return res.status(401).json({ status: "error", message: "No token provided" });
-
-  jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ status: "error", message: "Invalid token" });
-    req.user = user; // attach decoded user info
-    next();
-  });
-}
+// Middleware to validate JWT (Moved to ../middleware/auth.js)
 
 // Signup
 router.post("/signup", async (req, res) => {

@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,13 +14,7 @@ interface MoodTrackerProps {
 const MoodTracker = ({ onMoodChange }: MoodTrackerProps) => {
   const [selectedMood, setSelectedMood] = useState<number | null>(null);
   const [note, setNote] = useState("");
-  const [moodHistory, setMoodHistory] = useState([
-    { date: "2024-05-27", mood: 4, note: "Great day at work" },
-    { date: "2024-05-28", mood: 3, note: "Feeling okay" },
-    { date: "2024-05-29", mood: 5, note: "Excellent mood today" },
-    { date: "2024-05-30", mood: 2, note: "Bit stressed" },
-    { date: "2024-05-31", mood: 4, note: "Better day" },
-  ]);
+  const [moodHistory, setMoodHistory] = useState<any[]>([]);
 
   const moodOptions = [
     { value: 1, label: "Very Sad", icon: Frown, color: "text-red-500", bg: "bg-red-100", hoverBg: "hover:bg-red-200" },
@@ -30,30 +24,73 @@ const MoodTracker = ({ onMoodChange }: MoodTrackerProps) => {
     { value: 5, label: "Very Happy", icon: Star, color: "text-purple-500", bg: "bg-purple-100", hoverBg: "hover:bg-purple-200" },
   ];
 
+  const fetchMoodHistory = async () => {
+    try {
+      const token = localStorage.getItem("authToken");
+      if (!token) return;
+
+      const response = await fetch("http://localhost:5000/api/mood/logs", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json();
+      if (data.status === "success") {
+        const formattedHistory = data.data.map((log: any) => ({
+          date: new Date(log.created_at).toISOString().split('T')[0],
+          mood: log.mood,
+          note: log.note
+        }));
+
+        console.log(formattedHistory);
+        setMoodHistory(formattedHistory);
+      }
+    } catch (error) {
+      console.error("Error fetching mood history:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchMoodHistory();
+  }, []);
+
   const handleMoodSelect = (mood: number) => {
     setSelectedMood(mood);
-    // Immediately call the onMoodChange callback
     if (onMoodChange) {
       onMoodChange(mood);
     }
   };
 
-  const saveMood = () => {
+  const saveMood = async () => {
     if (selectedMood) {
-      const today = new Date().toISOString().split('T')[0];
-      const newEntry = {
-        date: today,
-        mood: selectedMood,
-        note: note,
-      };
-      
-      // Remove existing entry for today if it exists
-      const updatedHistory = moodHistory.filter(entry => entry.date !== today);
-      setMoodHistory([...updatedHistory, newEntry].sort((a, b) => a.date.localeCompare(b.date)));
-      
-      setSelectedMood(null);
-      setNote("");
-      toast.success("Mood saved successfully! 💜");
+      try {
+        const token = localStorage.getItem("authToken");
+        if (!token) {
+          toast.error("You must be logged in to save mood");
+          return;
+        }
+
+        const response = await fetch("http://localhost:5000/api/mood/log", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ mood: selectedMood, note }),
+        });
+
+        const data = await response.json();
+
+        if (data.status === "success" || response.ok) {
+          toast.success("Mood saved successfully! 💜");
+          setSelectedMood(null);
+          setNote("");
+          fetchMoodHistory();
+        } else {
+          toast.error(data.message || "Failed to save mood");
+        }
+      } catch (error) {
+        console.error("Error saving mood:", error);
+        toast.error("Something went wrong");
+      }
     }
   };
 
@@ -75,11 +112,10 @@ const MoodTracker = ({ onMoodChange }: MoodTrackerProps) => {
                 <button
                   key={mood.value}
                   onClick={() => handleMoodSelect(mood.value)}
-                  className={`p-4 rounded-xl border-2 transition-all duration-500 hover:scale-110 hover:rotate-3 hover:shadow-lg transform-gpu animate-fade-in ${
-                    selectedMood === mood.value
-                      ? `border-${mood.color.split('-')[1]}-400 ${mood.bg} shadow-lg scale-105 rotate-1 animate-bounce-gentle`
-                      : `border-gray-200 ${mood.hoverBg} bg-white/60 backdrop-blur-sm hover:border-gray-300`
-                  }`}
+                  className={`p-4 rounded-xl border-2 transition-all duration-500 hover:scale-110 hover:rotate-3 hover:shadow-lg transform-gpu animate-fade-in ${selectedMood === mood.value
+                    ? `border-${mood.color.split('-')[1]}-400 ${mood.bg} shadow-lg scale-105 rotate-1 animate-bounce-gentle`
+                    : `border-gray-200 ${mood.hoverBg} bg-white/60 backdrop-blur-sm hover:border-gray-300`
+                    }`}
                   style={{ animationDelay: `${index * 100}ms` }}
                 >
                   <Icon className={`h-8 w-8 mx-auto mb-2 ${mood.color} transition-all duration-300 hover:scale-125`} />
@@ -122,19 +158,19 @@ const MoodTracker = ({ onMoodChange }: MoodTrackerProps) => {
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={moodHistory}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" />
-              <XAxis 
-                dataKey="date" 
+              <XAxis
+                dataKey="date"
                 stroke="#6b7280"
                 tick={{ fontSize: 12 }}
                 tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
               />
-              <YAxis 
-                domain={[1, 5]} 
+              <YAxis
+                domain={[1, 5]}
                 stroke="#6b7280"
                 tick={{ fontSize: 12 }}
                 tickFormatter={(value) => moodOptions[value - 1]?.label || value}
               />
-              <Tooltip 
+              <Tooltip
                 labelFormatter={(value) => new Date(value).toLocaleDateString()}
                 formatter={(value: number, name) => [moodOptions[value - 1]?.label || value, "Mood"]}
                 contentStyle={{
@@ -145,10 +181,10 @@ const MoodTracker = ({ onMoodChange }: MoodTrackerProps) => {
                   boxShadow: '0 20px 40px rgba(0, 0, 0, 0.1)'
                 }}
               />
-              <Line 
-                type="monotone" 
-                dataKey="mood" 
-                stroke="url(#gradient)" 
+              <Line
+                type="monotone"
+                dataKey="mood"
+                stroke="url(#gradient)"
                 strokeWidth={3}
                 dot={{ fill: '#8b5cf6', strokeWidth: 2, r: 5 }}
                 activeDot={{ r: 8, fill: '#8b5cf6', stroke: '#fff', strokeWidth: 2 }}
