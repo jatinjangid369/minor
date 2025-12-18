@@ -67,6 +67,19 @@ INSERT INTO mood_quiz_results (user_id, score, mood_label, answers, created_at) 
 (1, 25, 'Okay',     '[{"q":1, "v":1}, {"q":2, "v":1}, {"q":3, "v":1}, {"q":4, "v":1}, {"q":5, "v":1}]', DATE_SUB(NOW(), INTERVAL 3 DAY));
 
 -- ============================================================
+-- Binaural Recommendations (AI Cache)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS binaural_recommendations (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  recommendation JSON NOT NULL, -- Stores { frequency, preset_name, reason, volume, duration }
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+-- ============================================================
 -- Mood Journey Query (FOR REFERENCE ONLY, NOT EXECUTED IN SEED)
 -- ============================================================
 
