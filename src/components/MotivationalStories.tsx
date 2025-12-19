@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, Play, Pause, RotateCcw, Heart, Star, RefreshCw } from "lucide-react";
+import { BookOpen, Play, Pause, RotateCcw, Heart, Star, RefreshCw, Zap } from "lucide-react";
 import { toast } from "sonner";
 
 interface Story {
@@ -23,6 +23,7 @@ const MotivationalStories = () => {
   const [isReading, setIsReading] = useState(false);
   const [readingMode, setReadingMode] = useState<"manual" | "auto">("manual");
   const [autoPlayInterval, setAutoPlayInterval] = useState<NodeJS.Timeout | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const stories: Story[] = [
     {
@@ -159,6 +160,51 @@ const MotivationalStories = () => {
     startReading(stories[randomIndex]);
   };
 
+  const getAIRecommendation = async () => {
+    try {
+      setIsGenerating(true);
+      const token = localStorage.getItem("authToken");
+      if (!token) {
+        toast.error("Please login to get AI recommendations");
+        setIsGenerating(false);
+        return;
+      }
+
+      const response = await fetch("http://localhost:5000/api/recommend/stories", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (data.status === "success" && data.data) {
+        const recommendedStory: Story = data.data;
+
+        // Add to stories list temporarily or just open it? 
+        // Let's just open it directly as a special story.
+        startReading(recommendedStory);
+
+        toast.success(
+          <div className="flex flex-col gap-1">
+            <span className="font-semibold">AI Story Generated</span>
+            <span className="text-xs opacity-90">Based on your recent mood</span>
+          </div>,
+          { duration: 5000 }
+        );
+      } else {
+        toast.error("Failed to get recommendation");
+      }
+    } catch (error) {
+      console.error("AI Recommendation error:", error);
+      toast.error("Error connecting to AI service");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const getCategoryColor = (category: string) => {
     switch (category) {
       case "resilience": return "bg-blue-100 text-blue-800";
@@ -198,7 +244,7 @@ const MotivationalStories = () => {
               Paragraph {currentParagraph + 1} of {selectedStory.story.length}
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
-              <div 
+              <div
                 className="bg-gradient-to-r from-amber-500 to-orange-500 h-2 rounded-full transition-all duration-500"
                 style={{ width: `${((currentParagraph + 1) / selectedStory.story.length) * 100}%` }}
               ></div>
@@ -292,13 +338,31 @@ const MotivationalStories = () => {
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex justify-end">
+        <div className="flex justify-between items-center bg-amber-50/50 p-2 rounded-lg mb-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={getAIRecommendation}
+            disabled={isGenerating}
+            className="bg-gradient-to-r from-amber-500 to-orange-600 text-white border-0 hover:from-amber-600 hover:to-orange-700 shadow-md animate-shimmer"
+          >
+            {isGenerating ? (
+              <span className="flex items-center gap-2">
+                <span className="animate-spin">✨</span> Writing...
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                <Zap className="h-4 w-4 fill-current" /> AI For You
+              </span>
+            )}
+          </Button>
+
           <Button variant="outline" size="sm" onClick={getRandomStory} className="animate-fade-in">
             <RefreshCw className="h-4 w-4 mr-2" />
-            Random Story
+            Random
           </Button>
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {stories.map((story, index) => (
             <div
@@ -335,8 +399,8 @@ const MotivationalStories = () => {
             <div>
               <h4 className="font-medium text-amber-800 mb-1">The Power of Stories</h4>
               <p className="text-sm text-amber-700">
-                Stories have been used throughout history to inspire, teach and heal. 
-                They help us connect to our emotions, find meaning in challenges, and 
+                Stories have been used throughout history to inspire, teach and heal.
+                They help us connect to our emotions, find meaning in challenges, and
                 develop resilience by learning from others' experiences.
               </p>
             </div>

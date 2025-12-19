@@ -21,14 +21,7 @@ const API_BASE =
   (typeof import.meta !== "undefined" && (import.meta as any).env?.MODE === "development" ? "http://localhost:5000" : "");
 
 const ChatSupport = () => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "1",
-      text: "Hello! I'm here to listen and support you. How are you feeling today? Feel free to share what's on your mind.",
-      sender: "bot",
-      timestamp: new Date(),
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -40,6 +33,58 @@ const ChatSupport = () => {
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
+
+  // Fetch greeting on mount
+  useEffect(() => {
+    const fetchGreeting = async () => {
+      try {
+        setIsLoading(true);
+        const token = localStorage.getItem("authToken"); // Assuming auth token usage, though ChatSupport didn't previously use it, relying on generic /pirate. If /chat/greeting is protected, we need token.
+        // If the original ChatSupport didn't use token, we might need to add logic.
+        // Assuming user is logged in for "quiz context" to work.
+
+        const headers: HeadersInit = { "Content-Type": "application/json" };
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+
+        const base = API_BASE || "";
+        const res = await fetch(`${base}/api/chat/greeting`, {
+          method: "POST",
+          headers,
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const greeting = data.greeting || "Hello! I'm here for you.";
+
+          setMessages([{
+            id: "greeting",
+            text: greeting,
+            sender: "bot",
+            timestamp: new Date()
+          }]);
+        } else {
+          // Fallback if not logged in or error
+          setMessages([{
+            id: "greeting",
+            text: "Hello! I'm here to listen and support you. How are you feeling today?",
+            sender: "bot",
+            timestamp: new Date()
+          }]);
+        }
+      } catch (e) {
+        setMessages([{
+          id: "greeting",
+          text: "Hello! I'm here to listen and support you.",
+          sender: "bot",
+          timestamp: new Date()
+        }]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchGreeting();
+  }, []);
 
   // Minimal fetch to your backend
   const generateResponse = async (userMessage: string): Promise<string> => {

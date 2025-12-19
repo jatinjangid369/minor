@@ -180,7 +180,193 @@ router.post("/recommend/beats", authenticateToken, async (req, res) => {
   }
 });
 
+
+router.post("/recommend/stories", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+
+    // 1. SKIP CACHE - ALWAYS GENERATE FRESH PER USER REQUEST
+    // const [cached] = await db.execute(...) 
+
+    // 2. Fetch context (Mood Logs & Quiz)
+    const [moodLogs] = await db.execute(
+      "SELECT mood, note, created_at FROM mood_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT 5",
+      [userId]
+    );
+
+    const [quizResults] = await db.execute(
+      "SELECT score, mood_label, answers, created_at FROM mood_quiz_results WHERE user_id = ? ORDER BY created_at DESC LIMIT 3",
+      [userId]
+    );
+
+    // Context Definitions
+    const MOOD_DEFINITIONS = {
+      1: "Very Sad", 2: "Sad", 3: "Neutral", 4: "Happy", 5: "Very Happy"
+    };
+
+    // Enrich Data
+    const enrichedMoods = moodLogs.map(log => ({
+      ...log,
+      mood_text: MOOD_DEFINITIONS[log.mood] || "Unknown"
+    }));
+
+    // Parse Quiz Answers if string
+    const enrichedQuiz = quizResults.map(q => {
+      let answers = q.answers;
+      if (typeof answers === 'string') {
+        try { answers = JSON.parse(answers); } catch (e) { }
+      }
+      return { ...q, answers };
+    });
+
+    // 3. Construct Prompt
+    const context = {
+      recent_moods: enrichedMoods,
+      recent_quiz_results: enrichedQuiz
+    };
+
+    const systemPrompt = `You are a wise storyteller and mentor. 
+    Analyze the user's recent mood history AND their specific "Quiz Results" to generate a highly personalized motivational story.
+    
+    Data Context:
+    - Moods are 1-5 (Very Sad to Very Happy).
+    - Quiz Results contain scores and specific answers about:
+      Q1: Sleep Quality (Low=Poor)
+      Q2: Energy Level (Low=Drained)
+      Q3: Social Interest (Low=Isolated)
+      Q4: Optimism (Low=Pessimistic)
+      Q5: Concentration (Low=Unfocused)
+
+    Analysis Instructions:
+    - Look at the TREND of moods.
+    - Look at specific QUIZ answers. e.g. if Sleep (Q1) is low, tell a story about rest or patience. If Social (Q3) is low, tell a story about connection or self-reliance.
+    
+    Return ONLY a JSON object with this exact schema:
+    {
+      "id": "ai-generated-${Date.now()}",
+      "title": "Story Title",
+      "category": "one of: resilience, growth, success, kindness, perseverance",
+      "duration": "approx reading time (e.g. '3 min')",
+      "story": ["paragraph 1", "paragraph 2", "paragraph 3", "paragraph 4", "paragraph 5"],
+      "lesson": "The core moral of the story",
+      "affirmation": "A short, powerful 'I am' statement related to the story",
+      "tags": ["Tag1", "Tag2", "Tag3"]
+    }
+
+    Guidelines:
+    - Keep the story engaging, around 300-400 words total, split into 4-6 paragraphs.
+    - Make it feel timeless, like a fable or a modern parable.
+    - ALWAYS generate a UNIQUE story if possible, avoid repeating common fables if the user makes multiple requests.
+    `;
+
+    const userPrompt = `User Context: ${JSON.stringify(context)}. Generate a UNIQUE story now.`;
+
+    // 4. Call OpenAI
+    const response = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ],
+      response_format: { type: "json_object" }
+    });
+
+    const recommendationRaw = response.choices[0].message.content;
+    const recommendation = JSON.parse(recommendationRaw);
+
+    // Ensure ID is uniqueish
+    recommendation.id = `ai-${Date.now()}`;
+
+
+    // 5. Save to Cache
+    await db.execute(
+      "INSERT INTO story_recommendations (user_id, recommendation) VALUES (?, ?)",
+      [userId, JSON.stringify(recommendation)]
+    );
+
+    return res.json({ status: "success", data: recommendation, source: "ai" });
+
+  } catch (err) {
+    console.error("Error generating story recommendation:", err);
+    return res.status(500).json({ error: "Failed to generate story recommendation" });
+  }
+});
+
+router.post("/chat/greeting", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Check for "recent" quiz result (e.g. last 10 minutes) to determine context
+    const [recentQuiz] = await db.execute(
+      "SELECT score, mood_label, answers, created_at FROM mood_quiz_results WHERE user_id = ? AND created_at > DATE_SUB(NOW(), INTERVAL 10 MINUTE) ORDER BY created_at DESC LIMIT 1",
+      [userId]
+    );
+
+    let systemPrompt = "";
+    let userPrompt = "";
+
+    if (recentQuiz.length > 0) {
+      // SCENARIO: Post-Quiz Context
+      const quiz = recentQuiz[0];
+      const moodLabel = quiz.mood_label || "Unknown";
+
+      systemPrompt = `You are an empathetic, supportive AI friend and therapist.
+      The user just finished a mood assessment.
+      Result: ${moodLabel}.
+      
+      Your Goal: proactive and warm greeting acknowledging their recent check-in.
+      Do NOT ask to take the quiz again. Ask how they are feeling about the result or how you can help.
+      Keep it short (1-2 sentences).
+      `;
+      userPrompt = `Generate a greeting for a user who just scored as "${moodLabel}".`;
+
+    } else {
+      // SCENARIO: Direct Access
+      systemPrompt = `You are a helpful, warm AI friend.
+      The user has opened the chat directly (did not just take a quiz).
+      
+      Your Goal: Paraphrase this specific meaning into a warm, unique greeting:
+      "Oh as I can see you directly come to me, let me know then what you want to discuss with me, I am here."
+      
+      Instructions:
+      - Keep the CORE MEANING of acknowledging they came directly to you.
+      - Be warm and inviting.
+      - Keep it short (1-2 sentences).
+      - vary the phrasing so it doesn't sound robotic.
+      `;
+      userPrompt = "Generate a warm direct-access greeting.";
+    }
+
+    const response = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ],
+      max_tokens: 100
+    });
+
+    const greeting = response.choices[0].message.content;
+
+    // Return context info so frontend knows state
+    return res.json({
+      greeting,
+      contextType: recentQuiz.length > 0 ? "post-quiz" : "direct"
+    });
+
+  } catch (err) {
+    console.error("Error generating chat greeting:", err);
+    // Fallback if AI fails
+    return res.json({
+      greeting: "I'm here to listen. What's on your mind?",
+      contextType: "fallback"
+    });
+  }
+});
+
 module.exports = router;
+
 
 
 
