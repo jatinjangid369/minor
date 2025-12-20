@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS mood_logs (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL,
   mood INT NOT NULL,     -- 1=Very Sad, 2=Sad, 3=Neutral, 4=Happy, 5=Very Happy
+  energy INT DEFAULT 3,  -- 1=Low, 5=High
   note TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
@@ -37,12 +38,12 @@ CREATE TABLE IF NOT EXISTS mood_logs (
 );
 
 -- Seed Mood Logs (Sample Data Matching Your UI Graph)
-INSERT INTO mood_logs (user_id, mood, note, created_at) VALUES
-(1, 4, 'Good day!',        '2025-05-27 10:00:00'),  -- Happy
-(1, 3, 'Bit stressed.',    '2025-05-28 10:00:00'),  -- Neutral
-(1, 5, 'Fantastic mood!',  '2025-05-29 10:00:00'),  -- Very Happy
-(1, 2, 'Not great today.', '2025-05-30 10:00:00'),  -- Sad
-(1, 4, 'Feeling better.',  '2025-05-31 10:00:00');  -- Happy
+INSERT INTO mood_logs (user_id, mood, energy, note, created_at) VALUES
+(1, 4, 3, 'Good day!',        '2025-05-27 10:00:00'),  -- Happy
+(1, 3, 4, 'Bit stressed.',    '2025-05-28 10:00:00'),  -- Neutral
+(1, 5, 5, 'Fantastic mood!',  '2025-05-29 10:00:00'),  -- Very Happy
+(1, 2, 2, 'Not great today.', '2025-05-30 10:00:00'),  -- Sad
+(1, 4, 4, 'Feeling better.',  '2025-05-31 10:00:00');  -- Happy
 
 -- ============================================================
 -- Mood Quiz Results Table

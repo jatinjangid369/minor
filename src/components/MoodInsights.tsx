@@ -1,48 +1,80 @@
 
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { TrendingUp, Calendar, Brain, Target } from "lucide-react";
 
+interface Insight {
+  title: string;
+  description: string;
+  type: "achievement" | "pattern" | "suggestion";
+}
+
+interface StatsData {
+  averageMood: string;
+  moodTrend: string;
+  streakDays: number;
+  weeklyData: { day: string; mood: number; energy: number }[];
+  moodDistribution: { name: string; value: number; color: string }[];
+  insights: Insight[];
+}
+
 const MoodInsights = () => {
-  const weeklyData = [
-    { day: "Mon", mood: 4, energy: 3 },
-    { day: "Tue", mood: 3, energy: 4 },
-    { day: "Wed", mood: 5, energy: 5 },
-    { day: "Thu", mood: 2, energy: 2 },
-    { day: "Fri", mood: 4, energy: 4 },
-    { day: "Sat", mood: 5, energy: 5 },
-    { day: "Sun", mood: 4, energy: 3 },
-  ];
+  const [stats, setStats] = useState<StatsData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const moodDistribution = [
-    { name: "Very Happy", value: 25, color: "#8b5cf6" },
-    { name: "Happy", value: 35, color: "#10b981" },
-    { name: "Neutral", value: 20, color: "#f59e0b" },
-    { name: "Sad", value: 15, color: "#f97316" },
-    { name: "Very Sad", value: 5, color: "#ef4444" },
-  ];
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const token = localStorage.getItem("authToken");
+        if (!token) {
+          setError("Please log in to view insights");
+          setLoading(false);
+          return;
+        }
 
-  const averageMood = 3.8;
-  const moodTrend = "+0.5";
-  const streakDays = 7;
+        const response = await fetch("http://localhost:5000/api/mood/stats", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
-  const insights = [
-    {
-      title: "Your mood tends to be higher on weekends",
-      description: "Consider incorporating more weekend-like activities during weekdays",
-      type: "pattern"
-    },
-    {
-      title: "You've been consistent with tracking",
-      description: "Great job maintaining this healthy habit for 7 days!",
-      type: "achievement"
-    },
-    {
-      title: "Midweek dip noticed",
-      description: "Wednesday seems challenging. Try planning something enjoyable for midweek",
-      type: "suggestion"
-    },
-  ];
+        const json = await response.json();
+
+        if (json.status === "success") {
+          setStats(json.data);
+        } else {
+          setError(json.message || "Failed to load insights");
+        }
+      } catch (err) {
+        console.error("Error fetching mood insights:", err);
+        setError("Failed to connect to server");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center p-8 bg-red-50 rounded-lg text-red-600">
+        <p>{error}</p>
+      </div>
+    );
+  }
+
+  if (!stats) return null;
+
+  const { averageMood, moodTrend, streakDays, weeklyData, moodDistribution, insights } = stats;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -70,7 +102,18 @@ const MoodInsights = () => {
           <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
             <CardContent className="p-4 text-center">
               <Target className="h-8 w-8 text-purple-600 mx-auto mb-2" />
-              <p className="text-2xl font-bold text-purple-800">85%</p>
+              <p className="text-2xl font-bold text-purple-800">
+                {/* Note: 'Positive Days' % logic wasn't in backend yet, we can add it or just remove this card/mock it. 
+                   The user wanted strict adherence to previous UI which had static 85%.
+                   Since backend didn't implement it in this turn, I'll calculate it from distribution if possible, or placeholder.
+                   Let's calculate from distribution for "Positive" (Mood 4 & 5).
+               */}
+                {(() => {
+                  const positive = moodDistribution.filter(d => d.name === "Happy" || d.name === "Very Happy")
+                    .reduce((acc, curr) => acc + curr.value, 0);
+                  return positive + "%";
+                })()}
+              </p>
               <p className="text-sm text-purple-600">Positive Days</p>
               <p className="text-xs text-purple-600 font-medium">Great progress</p>
             </CardContent>
@@ -87,8 +130,8 @@ const MoodInsights = () => {
               <BarChart data={weeklyData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" />
                 <XAxis dataKey="day" stroke="#6b7280" />
-                <YAxis domain={[1, 5]} stroke="#6b7280" />
-                <Tooltip 
+                <YAxis domain={[0, 5]} stroke="#6b7280" />
+                <Tooltip
                   contentStyle={{
                     backgroundColor: 'rgba(255, 255, 255, 0.95)',
                     border: 'none',
@@ -97,6 +140,7 @@ const MoodInsights = () => {
                   }}
                 />
                 <Bar dataKey="mood" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                {/* Energy bar rendered if data exists */}
                 <Bar dataKey="energy" fill="#10b981" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -142,22 +186,25 @@ const MoodInsights = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {insights.map((insight, index) => (
-              <div
-                key={index}
-                className="p-4 rounded-lg bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-100"
-              >
-                <h4 className="font-medium text-gray-800 mb-2">{insight.title}</h4>
-                <p className="text-sm text-gray-600">{insight.description}</p>
-                <span className={`inline-block mt-2 px-2 py-1 text-xs rounded-full ${
-                  insight.type === 'achievement' ? 'bg-green-100 text-green-700' :
-                  insight.type === 'pattern' ? 'bg-blue-100 text-blue-700' :
-                  'bg-purple-100 text-purple-700'
-                }`}>
-                  {insight.type}
-                </span>
-              </div>
-            ))}
+            {insights.length > 0 ? (
+              insights.map((insight, index) => (
+                <div
+                  key={index}
+                  className="p-4 rounded-lg bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-100"
+                >
+                  <h4 className="font-medium text-gray-800 mb-2">{insight.title}</h4>
+                  <p className="text-sm text-gray-600">{insight.description}</p>
+                  <span className={`inline-block mt-2 px-2 py-1 text-xs rounded-full ${insight.type === 'achievement' ? 'bg-green-100 text-green-700' :
+                    insight.type === 'pattern' ? 'bg-blue-100 text-blue-700' :
+                      'bg-purple-100 text-purple-700'
+                    }`}>
+                    {insight.type}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <p className="text-gray-500 text-center py-4">Not enough data for insights yet.</p>
+            )}
           </CardContent>
         </Card>
       </div>
