@@ -12,20 +12,34 @@ In today's fast-paced world, mental health issues like anxiety, stress, and depr
 
 - 🎧 *Binaural Beats & Solfeggio Frequencies*: Scientifically backed audio therapy to reduce stress, anxiety, and enhance focus.
 - 📈 *Mood Tracker*: Real-time mood logging to analyze emotional trends and triggers.
-- 🤖 *AI Psychiatrist Bot* (menu-based): A friendly, low-level AI chatbot that helps users navigate their feelings and provides actionable advice.
-- 🎮 *Mood-Boosting Games & Satisfying Videos*: Interactive mini-games and visually soothing content for instant mood uplift.
-- 📚 *Motivational Stories*: Real stories and quotes to inspire and emotionally energize users.
-- 📊 *Insights Dashboard*: Visual reports and statistics to help users reflect on their emotional progress over time.
+- 🤖 *AI Psychiatrist Bot*: A friendly, GPT-4o powered AI chatbot that provides empathetic support and actionable advice.
+- 🎮 *Mood-Boosting Games*: Interactive content for instant mood uplift.
+- 📚 *Motivational Stories*: AI-generated personalized stories based on user mood and quiz results.
+- 📊 *Mood Insights*: **Real-time dynamic dashboard** visualizing weekly mood & energy trends, distribution, and AI-generated pattern insights (Implemented).
 
-The frontend is built using *React*, and we integrated generative AI and external APIs to personalize the user experience.
+The frontend is built using *React* (Vite), and the backend uses *Node.js/Express* with *MySQL* for persistent data and *OpenAI* for generative features.
 
 ---
 
-## 🔌 APIs Used
+## 🔌 APIs & Features
 
-- 🎵 *Loveable AI*: For personalized mood support responses and audio suggestions.
-- 🌦 *Emotion-to-Content Mapping API* (custom): Maps user mood to games, videos, or motivational stories.
-- 📈 *Mood Insights Engine* (custom backend): Analyzes mood tracking data for insights and trends (we are working on it bcz of time constrains we are not able to integrate it yet)
+- 🧠 *OpenAI GPT-4o Integration*: 
+    - `/api/chat`: Empathetic chat responses.
+    - `/api/recommend/stories`: Generates unique stories based on mood history.
+    - `/api/recommend/beats`: Suggests binaural beats tailored to current state.
+- 📊 *Mood Analytics Engine*:
+    - `/api/mood/stats`: Aggregates daily mood/energy, calculates streaks, and generates rule-based insights (e.g., "Happier on weekends").
+    - `/api/mood/log`: Tracks Mood (1-5), Energy (1-5), and notes.
+- 🔐 *Authentication*: Secure JWT-based auth for user data privacy.
+
+---
+
+## 🛠 Tech Stack
+
+- **Frontend**: React, TypeScript, Tailwind CSS, Recharts, Lucide React, Framer Motion.
+- **Backend**: Node.js, Express.js.
+- **Database**: MySQL (Stores Users, Mood Logs, Quiz Results, AI Caches).
+- **AI**: OpenAI API (GPT-4o-mini).
 
 ---
 
@@ -33,6 +47,42 @@ The frontend is built using *React*, and we integrated generative AI and externa
 
 ### Prerequisites
 - Node.js (v16 or above)
-- npm 
-- Git
-- React
+- MySQL Server
+- OpenAI API Key
+
+### 1. Database Setup
+Create the database and seed initial data:
+```sql
+-- Run contents of server/seed.sql in your MySQL client
+CREATE DATABASE mindful_u_db;
+USE mindful_u_db;
+-- (Import tables from seed.sql)
+```
+
+### 2. Backend Setup
+1. Navigate to `/server`.
+2. Install dependencies: `npm install`.
+3. Create a `.env` file with:
+   ```env
+   DB_HOST=localhost
+   DB_USER=root
+   DB_PASS=your_password
+   DB_NAME=mindful_u_db
+   OPENAI_API_KEY=your_openai_key
+   JWT_SECRET=your_jwt_secret
+   ```
+4. Run server: `node index.js` (Runs on port 5000).
+
+### 3. Frontend Setup
+1. Navigate to root directory.
+2. Install dependencies: `npm install`.
+3. Run dev server: `npm run dev`.
+4. Open `http://localhost:5173` in your browser.
+
+---
+
+## 🚀 Status
+- ✅ **Dynamic Mood Insights**: Fully integrated with real-time database fetching.
+- ✅ **Mood Tracking**: Supports Mood & Energy logging.
+- ✅ **AI Chat & Recommendations**: Operational.
+
