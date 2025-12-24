@@ -137,7 +137,7 @@ const AuthForm = ({ onLogin }: AuthFormProps) => {
             </div>
           </div>
           <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent animate-text-shimmer">
-            MindfulMe
+            Mindful U
           </h1>
           <p className="text-gray-700 font-medium mt-2">Your mental wellness journey starts here</p>
         </div>

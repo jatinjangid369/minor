@@ -141,10 +141,10 @@ const Index = ({ username, onLogout }) => {
                   <AlertTriangle className="h-3 w-3 text-red-500" />
                   <span className="hidden sm:inline">SOS</span>
                 </TabsTrigger> */}
-                <TabsTrigger value="checkin" className="flex items-center gap-1 text-xs transition-all duration-300 hover:scale-105 data-[state=active]:bg-white/80">
+                 <TabsTrigger value="checkin" className="flex items-center gap-1 text-xs transition-all duration-300 hover:scale-105 data-[state=active]:bg-white/80">
                   <Brain className="h-3 w-3 animate-spin-slow" />
                   <span className="hidden sm:inline">Check-in</span>
-                </TabsTrigger>
+                </TabsTrigger> 
                 <TabsTrigger value="insights" className="flex items-center gap-1 text-xs transition-all duration-300 hover:scale-105 data-[state=active]:bg-white/80">
                   <TrendingUp className="h-3 w-3 animate-bounce-x" />
                   <span className="hidden sm:inline">Insights</span>

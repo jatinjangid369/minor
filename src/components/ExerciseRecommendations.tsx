@@ -1,9 +1,9 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dumbbell, Brain, Heart, Zap, Timer, Play, CheckCircle } from "lucide-react";
+import { Dumbbell, Brain, Heart, Zap, Timer, Play, CheckCircle, Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface Exercise {
@@ -24,6 +24,29 @@ const ExerciseRecommendations = () => {
   const [currentStep, setCurrentStep] = useState(0);
   const [isActive, setIsActive] = useState(false);
   const [completedExercises, setCompletedExercises] = useState<string[]>([]);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [aiExercise, setAiExercise] = useState<Exercise | null>(null);
+
+  useEffect(() => {
+    fetchCompletedExercises();
+  }, []);
+
+  const fetchCompletedExercises = async () => {
+    try {
+      const token = localStorage.getItem("authToken");
+      if (!token) return;
+
+      const response = await fetch("http://localhost:5000/api/activity/exercises", {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (data.status === "success") {
+        setCompletedExercises(data.data.map((log: any) => log.exercise_name));
+      }
+    } catch (error) {
+      console.error("Error fetching completed exercises:", error);
+    }
+  };
 
   const exercises: Exercise[] = [
     {
@@ -142,6 +165,49 @@ const ExerciseRecommendations = () => {
     }
   ];
 
+  const generateAIExercise = async () => {
+    try {
+      setIsGenerating(true);
+      const token = localStorage.getItem("authToken");
+      if (!token) {
+        toast.error("Please login to use AI features");
+        return;
+      }
+
+      const response = await fetch("http://localhost:5000/api/recommend/exercises", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
+      });
+
+      const data = await response.json();
+      if (data.status === "success") {
+        const exerciseData = data.data;
+        // Map icon based on type
+        const icon = exerciseData.type === "breathing" ? <Heart className="h-5 w-5" /> :
+          exerciseData.type === "mental" ? <Brain className="h-5 w-5" /> :
+            <Dumbbell className="h-5 w-5" />;
+
+        const color = exerciseData.type === "breathing" ? "bg-blue-500" :
+          exerciseData.type === "mental" ? "bg-purple-500" :
+            "bg-orange-500";
+
+        const newExercise: Exercise = { ...exerciseData, icon, color };
+        setAiExercise(newExercise);
+        toast.success("AI has generated a personalized exercise for you! ✨");
+      } else {
+        toast.error("Failed to generate exercise");
+      }
+    } catch (error) {
+      console.error("AI Generation error:", error);
+      toast.error("Something went wrong with AI generation");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const startExercise = (exercise: Exercise) => {
     setSelectedExercise(exercise);
     setCurrentStep(0);
@@ -157,9 +223,32 @@ const ExerciseRecommendations = () => {
     }
   };
 
-  const completeExercise = () => {
+  const completeExercise = async () => {
     if (selectedExercise) {
-      setCompletedExercises(prev => [...prev, selectedExercise.id]);
+      const name = selectedExercise.name;
+      setCompletedExercises(prev => [...prev, name]); // Optimistic update
+
+      try {
+        const token = localStorage.getItem("authToken");
+        if (token) {
+          await fetch("http://localhost:5000/api/activity/exercise", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              name: selectedExercise.name,
+              type: selectedExercise.type,
+              duration: selectedExercise.duration,
+              difficulty: selectedExercise.difficulty
+            })
+          });
+        }
+      } catch (error) {
+        console.error("Error saving exercise log:", error);
+      }
+
       toast.success(`Completed ${selectedExercise.name}! Great job! 🎉`);
     }
     setSelectedExercise(null);
@@ -222,7 +311,7 @@ const ExerciseRecommendations = () => {
               Step {currentStep + 1} of {selectedExercise.instructions.length}
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
-              <div 
+              <div
                 className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-500"
                 style={{ width: `${((currentStep + 1) / selectedExercise.instructions.length) * 100}%` }}
               ></div>
@@ -262,24 +351,81 @@ const ExerciseRecommendations = () => {
   return (
     <Card className="bg-white/40 backdrop-blur-lg border-white/30 shadow-2xl animate-fade-in-scale">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Dumbbell className="h-5 w-5 text-green-500 animate-bounce" />
-          Exercise Recommendations
-        </CardTitle>
-        <p className="text-sm text-gray-600">
-          Physical and mental exercises to boost your wellbeing
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Dumbbell className="h-5 w-5 text-green-500 animate-bounce" />
+              Exercise Recommendations
+            </CardTitle>
+            <p className="text-sm text-gray-600">
+              Physical and mental exercises to boost your wellbeing
+            </p>
+          </div>
+          <Button
+            onClick={generateAIExercise}
+            disabled={isGenerating}
+            className="bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white shadow-lg transition-all duration-300 hover:scale-105"
+          >
+            {isGenerating ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Sparkles className="h-4 w-4 mr-2" />
+            )}
+            AI Personalize
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
+        {aiExercise && (
+          <div className="mb-8 p-6 rounded-2xl border-2 border-purple-400 bg-purple-50/50 backdrop-blur-sm animate-fade-in-scale relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-2">
+              <Badge className="bg-purple-600 text-white flex items-center gap-1">
+                <Sparkles className="h-3 w-3" />
+                AI Generated
+              </Badge>
+            </div>
+
+            <div className="flex items-start gap-4">
+              <div className={`p-3 rounded-xl ${aiExercise.color} text-white shadow-lg animate-pulse-gentle`}>
+                {aiExercise.icon}
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-bold text-gray-800 mb-1">{aiExercise.name}</h3>
+                <p className="text-gray-600 mb-4">{aiExercise.description}</p>
+
+                <div className="bg-white/40 p-3 rounded-lg border border-purple-200 mb-4">
+                  <p className="text-sm text-purple-800 italic">
+                    <Sparkles className="h-3 w-3 inline mr-1" />
+                    {(aiExercise as any).reason}
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-2 mb-6">
+                  <Badge variant="secondary" className={getTypeColor(aiExercise.type)}>{aiExercise.type}</Badge>
+                  <Badge variant="secondary" className={getDifficultyColor(aiExercise.difficulty)}>{aiExercise.difficulty}</Badge>
+                  <Badge variant="outline"><Timer className="h-3 w-3 mr-1" />{aiExercise.duration}</Badge>
+                </div>
+
+                <Button
+                  onClick={() => startExercise(aiExercise)}
+                  className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700"
+                >
+                  <Play className="h-4 w-4 mr-2" />
+                  Start AI Exercise
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {exercises.map((exercise, index) => (
             <div
               key={exercise.id}
-              className={`p-4 rounded-xl border-2 transition-all duration-300 hover:scale-105 hover:shadow-lg cursor-pointer animate-fade-in ${
-                completedExercises.includes(exercise.id)
-                  ? "border-green-400 bg-green-50"
-                  : "border-gray-200 bg-white/60 backdrop-blur-sm hover:border-gray-300"
-              }`}
+              className={`p-4 rounded-xl border-2 transition-all duration-300 hover:scale-105 hover:shadow-lg cursor-pointer animate-fade-in ${completedExercises.includes(exercise.id)
+                ? "border-green-400 bg-green-50"
+                : "border-gray-200 bg-white/60 backdrop-blur-sm hover:border-gray-300"
+                }`}
               style={{ animationDelay: `${index * 100}ms` }}
               onClick={() => startExercise(exercise)}
             >
@@ -297,7 +443,7 @@ const ExerciseRecommendations = () => {
                     </h3>
                   </div>
                   <p className="text-sm text-gray-600 mb-3">{exercise.description}</p>
-                  
+
                   <div className="flex flex-wrap gap-1 mb-3">
                     <Badge className={getTypeColor(exercise.type)} variant="secondary">
                       {exercise.type}
@@ -309,7 +455,7 @@ const ExerciseRecommendations = () => {
                       {exercise.duration}
                     </Badge>
                   </div>
-                  
+
                   <div className="flex flex-wrap gap-1 mb-3">
                     {exercise.benefits.slice(0, 2).map((benefit, benefitIndex) => (
                       <Badge
@@ -322,7 +468,7 @@ const ExerciseRecommendations = () => {
                       </Badge>
                     ))}
                   </div>
-                  
+
                   <Button size="sm" variant="ghost" className="text-xs w-full">
                     <Play className="h-3 w-3 mr-1" />
                     Start Exercise
@@ -340,7 +486,7 @@ const ExerciseRecommendations = () => {
               <div>
                 <h4 className="font-medium text-green-800">Great Progress!</h4>
                 <p className="text-sm text-green-700">
-                  You've completed {completedExercises.length} exercise{completedExercises.length !== 1 ? 's' : ''} today. 
+                  You've completed {completedExercises.length} exercise{completedExercises.length !== 1 ? 's' : ''} today.
                   Keep up the excellent work!
                 </p>
               </div>
@@ -354,14 +500,14 @@ const ExerciseRecommendations = () => {
             <div>
               <h4 className="font-medium text-blue-800 mb-1">Exercise Benefits</h4>
               <p className="text-sm text-blue-700">
-                Regular physical and mental exercises can reduce stress hormones, increase endorphins, 
+                Regular physical and mental exercises can reduce stress hormones, increase endorphins,
                 improve cognitive function, and boost overall mental health.
               </p>
             </div>
           </div>
         </div>
       </CardContent>
-    </Card>
+    </Card >
   );
 };
 

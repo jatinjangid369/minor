@@ -1,11 +1,11 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
-import { Apple, Plus, TrendingUp, Brain, Heart, Zap } from "lucide-react";
+import { Apple, Plus, TrendingUp, Brain, Heart, Zap, Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface NutritionEntry {
@@ -35,6 +35,36 @@ const NutritionTracker = () => {
     { id: "3", food: "Blueberries", category: "fruits", moodImpact: "positive", time: "15:00", notes: "Antioxidants" },
     { id: "4", food: "Coffee", category: "other", moodImpact: "neutral", time: "08:00" },
   ]);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [aiNutrition, setAiNutrition] = useState<any | null>(null);
+
+  useEffect(() => {
+    fetchNutritionEntries();
+  }, []);
+
+  const fetchNutritionEntries = async () => {
+    try {
+      const token = localStorage.getItem("authToken");
+      if (!token) return;
+
+      const response = await fetch("http://localhost:5000/api/activity/nutrition", {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (data.status === "success") {
+        setNutritionEntries(data.data.map((log: any) => ({
+          id: log.id.toString(),
+          food: log.food,
+          category: log.category,
+          moodImpact: log.mood_impact,
+          time: new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          notes: log.notes
+        })));
+      }
+    } catch (error) {
+      console.error("Error fetching nutrition entries:", error);
+    }
+  };
 
   const categories = [
     { value: "protein", label: "Protein", color: "bg-red-500" },
@@ -82,8 +112,63 @@ const NutritionTracker = () => {
     }
   ];
 
-  const addNutritionEntry = () => {
+  const generateAINutrition = async () => {
+    try {
+      setIsGenerating(true);
+      const token = localStorage.getItem("authToken");
+      if (!token) {
+        toast.error("Please login to use AI features");
+        return;
+      }
+
+      const response = await fetch("http://localhost:5000/api/recommend/nutrition", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
+      });
+
+      const data = await response.json();
+      if (data.status === "success") {
+        setAiNutrition(data.data);
+        toast.success("AI has prepared a personalized nutrition insight for you! 🥗");
+      } else {
+        toast.error("Failed to generate nutrition advice");
+      }
+    } catch (error) {
+      console.error("AI Generation error:", error);
+      toast.error("Something went wrong with AI generation");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const addNutritionEntry = async () => {
     if (!newFood.trim()) return;
+
+    const entryData = {
+      food: newFood,
+      category: selectedCategory,
+      moodImpact: selectedMoodImpact,
+      notes: ""
+    };
+
+    try {
+      const token = localStorage.getItem("authToken");
+      if (token) {
+        await fetch("http://localhost:5000/api/activity/nutrition", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify(entryData)
+        });
+      }
+    } catch (error) {
+      console.error("Error saving nutrition log:", error);
+    }
 
     const newEntry: NutritionEntry = {
       id: Date.now().toString(),
@@ -129,15 +214,68 @@ const NutritionTracker = () => {
       {/* Food Logger */}
       <Card className="bg-white/40 backdrop-blur-lg border-white/30 shadow-2xl animate-fade-in-scale">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Apple className="h-5 w-5 text-green-500 animate-bounce" />
-            Nutrition Tracker
-          </CardTitle>
-          <p className="text-sm text-gray-600">
-            Track how food affects your mood and energy
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Apple className="h-5 w-5 text-green-500 animate-bounce" />
+                Nutrition Tracker
+              </CardTitle>
+              <p className="text-sm text-gray-600">
+                Track how food affects your mood and energy
+              </p>
+            </div>
+            <Button
+              onClick={generateAINutrition}
+              disabled={isGenerating}
+              variant="outline"
+              className="border-purple-200 hover:border-purple-300 bg-purple-50/50 text-purple-700 hover:text-purple-800 transition-all duration-300 hover:scale-105"
+            >
+              {isGenerating ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4 mr-2" />
+              )}
+              AI Advice
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {aiNutrition && (
+            <div className="mb-6 p-5 rounded-2xl border-2 border-green-400 bg-green-50/50 backdrop-blur-sm animate-fade-in-scale relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-2">
+                <Badge className="bg-green-600 text-white flex items-center gap-1">
+                  <Sparkles className="h-3 w-3" />
+                  AI Personalized
+                </Badge>
+              </div>
+
+              <div className="flex items-start gap-4">
+                <div className="p-3 rounded-xl bg-green-500 text-white shadow-lg animate-pulse-gentle">
+                  <Zap className="h-5 w-5" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-gray-800 mb-1">{aiNutrition.title}</h3>
+                  <p className="text-sm font-medium text-green-800 mb-2">{aiNutrition.recommendation}</p>
+                  <p className="text-xs text-gray-600 mb-3">{aiNutrition.reason}</p>
+
+                  <div className="flex flex-wrap gap-1 mb-3">
+                    {aiNutrition.nutrients?.map((n: string, i: number) => (
+                      <Badge key={i} variant="secondary" className="text-[10px] bg-white/60">{n}</Badge>
+                    ))}
+                  </div>
+
+                  <div className="space-y-1">
+                    {aiNutrition.tips?.map((tip: string, i: number) => (
+                      <div key={i} className="flex items-start gap-2 text-[11px] text-gray-700">
+                        <div className="w-1 h-1 rounded-full bg-green-500 mt-1.5" />
+                        {tip}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
           {/* Add Food Form */}
           <div className="space-y-3 animate-fade-in">
             <Input
@@ -147,7 +285,7 @@ const NutritionTracker = () => {
               className="bg-white/60 backdrop-blur-sm"
               onKeyPress={(e) => e.key === "Enter" && addNutritionEntry()}
             />
-            
+
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">Category</label>
@@ -163,7 +301,7 @@ const NutritionTracker = () => {
                   ))}
                 </select>
               </div>
-              
+
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">Mood Impact</label>
                 <select
@@ -179,7 +317,7 @@ const NutritionTracker = () => {
                 </select>
               </div>
             </div>
-            
+
             <Button onClick={addNutritionEntry} className="w-full" disabled={!newFood.trim()}>
               <Plus className="h-4 w-4 mr-2" />
               Log Food
@@ -204,7 +342,7 @@ const NutritionTracker = () => {
                     <Badge variant="outline" className="text-xs">
                       {categories.find(c => c.value === entry.category)?.label}
                     </Badge>
-                    <Badge 
+                    <Badge
                       variant="outline"
                       className={`text-xs ${moodImpacts.find(m => m.value === entry.moodImpact)?.color}`}
                     >

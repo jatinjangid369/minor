@@ -365,6 +365,136 @@ router.post("/chat/greeting", authenticateToken, async (req, res) => {
   }
 });
 
+router.post("/recommend/exercises", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // 1. Fetch context (Mood Logs & Quiz)
+    const [moodLogs] = await db.execute(
+      "SELECT mood, note, created_at FROM mood_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT 5",
+      [userId]
+    );
+
+    const [quizResults] = await db.execute(
+      "SELECT score, mood_label, answers, created_at FROM mood_quiz_results WHERE user_id = ? ORDER BY created_at DESC LIMIT 3",
+      [userId]
+    );
+
+    const MOOD_DEFINITIONS = { 1: "Very Sad", 2: "Sad", 3: "Neutral", 4: "Happy", 5: "Very Happy" };
+    const enrichedMoods = moodLogs.map(log => ({ ...log, mood_text: MOOD_DEFINITIONS[log.mood] || "Unknown" }));
+
+    const enrichedQuiz = quizResults.map(q => {
+      let answers = q.answers;
+      if (typeof answers === 'string') { try { answers = JSON.parse(answers); } catch (e) { } }
+      return { ...q, answers };
+    });
+
+    const context = { recent_moods: enrichedMoods, recent_quiz_results: enrichedQuiz };
+
+    const systemPrompt = `You are an expert fitness and wellness coach.
+    Analyze the user's mood and quiz results to recommend a personalized exercise.
+    
+    Return ONLY a JSON object with this exact schema:
+    {
+      "id": "ai-ex-${Date.now()}",
+      "name": "Exercise Name",
+      "type": "physical" | "mental" | "breathing",
+      "duration": "e.g. 10 min",
+      "difficulty": "easy" | "medium" | "hard",
+      "description": "Short description",
+      "benefits": ["benefit 1", "benefit 2"],
+      "instructions": ["step 1", "step 2", "step 3"],
+      "reason": "Why this is good for their current mood"
+    }
+    
+    Guidelines:
+    - Low Energy/Sad -> Gentle movement, breathing, or uplifting physical activity.
+    - High Stress/Anxiety -> Breathing or mental relaxation.
+    - High Energy/Happy -> More challenging physical exercises or focus-based mental tasks.
+    `;
+
+    const response = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: `User Context: ${JSON.stringify(context)}. Recommend an exercise.` }
+      ],
+      response_format: { type: "json_object" }
+    });
+
+    const recommendation = JSON.parse(response.choices[0].message.content);
+    await db.execute("INSERT INTO exercise_recommendations (user_id, recommendation) VALUES (?, ?)", [userId, JSON.stringify(recommendation)]);
+
+    return res.json({ status: "success", data: recommendation });
+  } catch (err) {
+    console.error("Error generating exercise:", err);
+    return res.status(500).json({ error: "Failed to generate exercise" });
+  }
+});
+
+router.post("/recommend/nutrition", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const [moodLogs] = await db.execute(
+      "SELECT mood, note, created_at FROM mood_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT 5",
+      [userId]
+    );
+
+    const [quizResults] = await db.execute(
+      "SELECT score, mood_label, answers, created_at FROM mood_quiz_results WHERE user_id = ? ORDER BY created_at DESC LIMIT 3",
+      [userId]
+    );
+
+    const MOOD_DEFINITIONS = { 1: "Very Sad", 2: "Sad", 3: "Neutral", 4: "Happy", 5: "Very Happy" };
+    const enrichedMoods = moodLogs.map(log => ({ ...log, mood_text: MOOD_DEFINITIONS[log.mood] || "Unknown" }));
+
+    const enrichedQuiz = quizResults.map(q => {
+      let answers = q.answers;
+      if (typeof answers === 'string') { try { answers = JSON.parse(answers); } catch (e) { } }
+      return { ...q, answers };
+    });
+
+    const context = { recent_moods: enrichedMoods, recent_quiz_results: enrichedQuiz };
+
+    const systemPrompt = `You are a nutrition expert specializing in mood-boosting foods (Nutritional Psychiatry).
+    Analyze the user's mood and quiz results to provide a personalized nutrition recommendation.
+    
+    Return ONLY a JSON object with this exact schema:
+    {
+      "title": "Short Title (e.g. Focus Recovery)",
+      "recommendation": "Main food/meal suggestion",
+      "reason": "Why this helps their current state (max 2 sentences)",
+      "mood_benefit": "Specific psychological benefit",
+      "nutrients": ["nutrient 1", "nutrient 2"],
+      "tips": ["tip 1", "tip 2"]
+    }
+    
+    Guidelines:
+    - Low Energy -> Complex carbs, iron-rich foods.
+    - Anxiety/Stress -> Magnesium-rich foods, Omega-3s.
+    - Low Mood -> Tryptophan-rich foods, Vitamin D.
+    `;
+
+    const response = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: `User Context: ${JSON.stringify(context)}. Provide nutrition advice.` }
+      ],
+      response_format: { type: "json_object" }
+    });
+
+    const recommendation = JSON.parse(response.choices[0].message.content);
+    await db.execute("INSERT INTO nutrition_recommendations (user_id, recommendation) VALUES (?, ?)", [userId, JSON.stringify(recommendation)]);
+
+    return res.json({ status: "success", data: recommendation });
+  } catch (err) {
+    console.error("Error generating nutrition:", err);
+    return res.status(500).json({ error: "Failed to generate nutrition advice" });
+  }
+});
+
 module.exports = router;
 
 
